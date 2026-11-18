@@ -1,4 +1,4 @@
-## Implementation
+## Model
 
 I fitted a GARCH(1,1) model to daily returns for five indices:
 the SSE Composite, EURO STOXX, FTSE, Nikkei and S&P 500.
@@ -58,3 +58,148 @@ result5 is obtained with initial a,b = 0.1, 0.89
 to test the sensitivity of omega
 result6 is obtained with a,b,w = [0.10, 0.80, 0.01 * v]
 result7 is obtained with a,b,w = [0.10, 0.80, 1.00 * v]
+
+## Stage 0: Initial experiments
+
+The results from the first seven runs are saved in `results/stage0/`.
+
+Some starting points produced almost identical estimates, while others gave
+different parameters and noticeably higher NLL values, even with
+`success=True`. I therefore decided to check the numerical reliability of
+the estimates before interpreting the market differences.
+
+The rest of the project is organised into four stages.
+
+I used multi-start optimization to check sensitivity to starting values.
+
+The 164 starting points combine a coarse grid with denser sampling around
+the alpha and beta ranges found in stage 0. For omega, I used multiples of
+each index's sample return variance:
+
+omega_0 = omega_scale * sample variance
+
+The same starting-point list was used for all five indices.
+
+The aim was to select the lowest-NLL estimates, inspect their gradients,
+and check whether different starting points repeatedly reached similar
+results.
+
+### Implementation
+
+The batch fitting code is in `fit_reliability_test.py`, results are saved in `results/stage1/reliability_results.csv`,
+and the analysis code is in `reliability_analysis.py`.
+
+During the initial attempt, I encountered numerical overflow in the
+conditional variance recursion. I added an upper bound of 1 on beta to
+prevent exponential amplification through the lagged variance term.
+
+This changes the search region relative to stage 0, but does not impose
+alpha + beta < 1.
+
+For each index, I sorted the results by NLL and selected the lowest-NLL
+candidate. I calculated its gradient euclidean norm.
+
+I also counted how many runs had NLL values within 1e-4 of the lowest
+value for that index. This is a numerical tolerance, not a statistical
+significance threshold.
+
+### Results and discussion
+
+All 820 runs returned finite parameter estimates, NLL values and gradients,
+with no missing values in the saved results.
+
+The selected estimates were in `results/stage1/final_params.csv`
+These estimates closely match the better results from stage 0.
+All five selected estimates lie away from the parameter bounds and
+satisfy alpha + beta < 1, even though this condition was not imposed.
+
+The number of runs within 1e-4 of each index's minimum NLL was:
+
+| Index | Runs near minimum | Percentage |
+| --- | ---: | ---: |
+| SSE | 134 / 164 | 81.7% |
+| EURO STOXX | 150 / 164 | 91.5% |
+| FTSE | 142 / 164 | 86.6% |
+| Nikkei | 160 / 164 | 97.6% |
+| S&P 500 | 139 / 164 | 84.8% |
+
+The parameter estimates within these groups were also very similar.
+This suggests that the selected solutions are reproducible across many
+different starting points.
+
+The selected candidates had gradient norms of approximately 0.0017–0.0062.
+These were much smaller than those of some poorer runs. For example,
+the worst SSE run returned an NLL of 6015.315 and a maximum absolute
+gradient component of about 1954, despite reporting success.
+
+All runs reported `success=True`, with the termination message:
+
+`CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH`
+
+
+Overall, repeated agreement across starting points and the relatively
+small gradients support using the selected parameters for the following
+stages. This provides evidence of numerical stability, but does not prove
+global optimality or establish that GARCH(1,1) adequately describes the
+data.
+
+## Stage 2: Volatility across markets
+
+### Plan
+
+Calculate summary statistics and plot daily returns, return distributions,
+rolling volatility and fitted conditional volatility.
+
+Compare volatility levels, responses to shocks and persistence across the
+five indices, distinguishing volatility magnitude from persistence.
+
+### Implementation
+
+<!-- Add calculation methods and plotting choices here. -->
+
+### Results and discussion
+
+<!-- Add tables, figures and interpretations here. -->
+
+## Stage 3: Residual diagnostics
+
+### Plan
+
+Calculate standardized residuals:
+
+z_t = (r_t - mu) / sigma_t
+
+Inspect the autocorrelation of both z_t and z_t^2 using ACF plots and
+Ljung–Box tests.
+
+Compare squared demeaned returns with squared standardized residuals to
+assess how much volatility clustering the model explains.
+
+### Implementation
+
+<!-- Add diagnostic settings and tests here. -->
+
+### Results and discussion
+
+<!-- Add diagnostic results and remaining model limitations here. -->
+
+## Stage 4: Normal vs Student-t innovations
+
+### Plan
+
+Fit Normal and Student-t GARCH(1,1) models using the same observations and
+consistent mean specifications for each index.
+
+Compare AIC and BIC to assess whether allowing heavier-tailed innovations
+improves the fit enough to justify the additional parameter.
+
+This comparison evaluates in-sample fit, not out-of-sample forecasting
+performance.
+
+### Implementation
+
+<!-- Add model specifications and estimation details here. -->
+
+### Results and discussion
+
+<!-- Add model comparisons and conclusions here. -->
